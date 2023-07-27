@@ -8,12 +8,15 @@ from sql_app.database import engine, SessionLocal
 from util.email_body import EmailSchema
 
 from prometheus_fastapi_instrumentator import Instrumentator
+from sender import Sender
+
+import json
 
 models.Base.metadata.create_all(bind=engine)
 
 conf = ConnectionConfig(
-    MAIL_USERNAME="1cada09aba3b38",
-    MAIL_PASSWORD="839678f967766f",
+    MAIL_USERNAME="6879bbf3693837",
+    MAIL_PASSWORD="7c370385bfa88b",
     MAIL_FROM="from@example.com",
     MAIL_PORT=587,
     MAIL_SERVER="sandbox.smtp.mailtrap.io",
@@ -55,9 +58,17 @@ async def get_all_history(db: Session = Depends(get_db)):
     return history
 
 
+@app.post("/dtm-array")
+async def dtm_array(info: Request, sender: Sender = Depends()):
+    lote_MTS = await info.json()
+    await sender.publish_messages(lote_MTS)
+    return {"code": "200", "msg": "Json has been sent to the queue"}
+
+
 @app.post("/dtm")
-async def dtm(info: Request, db: Session = Depends(get_db)):
-    info = await info.json()
+async def dtm(info: Request):
+    info = json.loads(info)
+
     states = set(info.get("states", []))
 
     if len(states) == 0:
@@ -125,9 +136,6 @@ async def dtm(info: Request, db: Session = Depends(get_db)):
     else:
         print('rejected')
         result = "rejected"
-
-    history = schemas.History(query=str(info), result=result)
-    crud.create_history(db=db, history=history)
 
     email_shema = EmailSchema(email=["to@example.com"])
 
